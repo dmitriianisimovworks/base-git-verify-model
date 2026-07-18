@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gitverify"
+version = "0.1.0"
+description = "Objective GitHub/GitLab profile truth-score from public signals"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9",
+    "rich>=13",
+]
+
+[project.scripts]
+gitverify = "gitverify.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gitverify"]
