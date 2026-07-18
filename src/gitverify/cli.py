@@ -6,8 +6,8 @@ import sys
 
 from rich.console import Console
 
-from gitverify import auth
-from gitverify.art import LOGO, TAGLINE
+from gitverify import auth, history
+from gitverify.art import LOGO
 from gitverify.github import GitHubProvider
 from gitverify.score import explain_axes
 from gitverify.service import VerificationResult, verify_candidate
@@ -21,18 +21,18 @@ def _bar(value: float, width: int = 20) -> str:
 
 
 def _print_banner(console: Console) -> None:
-    console.print(f"[dim]{LOGO[0]}[/dim]")
-    console.print(f"[dim]{LOGO[1]}[/dim]  [bold]{TAGLINE}[/bold]")
-    for row in LOGO[2:]:
-        console.print(f"[dim]{row}[/dim]")
+    for row in LOGO:
+        console.print(f"[bold]{row}[/bold]")
 
 
-def _print_result(console: Console, handle: str, result: VerificationResult) -> None:
-    _print_banner(console)
+def _print_result(
+    console: Console, handle: str, result: VerificationResult, previous: dict | None = None
+) -> None:
     score = result.score
+    delta = f" [{score.value - previous['score']:+.1f}]" if previous else ""
     console.print(
         f"\ngithub truth score for [cyan]{handle}[/cyan]: "
-        f"[bold]{score.value}[/bold] ({score.band})\n"
+        f"[bold]{score.value}[/bold]{delta} ({score.band})\n"
     )
     for axis, value in score.axes.items():
         console.print(f"  {axis:13} {_bar(value)} {value:.0f}")
@@ -70,6 +70,16 @@ def _print_json(handle: str, result: VerificationResult) -> None:
     )
 
 
+async def _analyze(handle: str, provider: GitHubProvider) -> VerificationResult:
+    result = await verify_candidate(handle, provider)
+    history.save_result(handle, result.score.value, result.score.band, result.score.axes)
+    return result
+
+
+def _resolve_token() -> str | None:
+    return os.environ.get(TOKEN_ENV) or auth.load_token()
+
+
 def _cmd_auth(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(prog="gitverify auth")
     parser.add_argument("action", choices=["login", "logout"])
@@ -90,32 +100,49 @@ def _cmd_auth(argv: list[str]) -> None:
 
 def _cmd_analyze(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(prog="gitverify")
-    parser.add_argument("handle")
     parser.add_argument("--token")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or os.environ.get(TOKEN_ENV) or auth.load_token()
+    console = Console()
+    if not args.json:
+        _print_banner(console)
+
+    token = args.token or _resolve_token()
     if not token:
-        print(
-            f"error: set {TOKEN_ENV} or pass --token, or run 'gitverify auth login'",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
+        if args.json:
+            print("error: not authenticated, run 'gitverify auth login'", file=sys.stderr)
+            raise SystemExit(1)
+        console.print("\nnot authenticated yet.")
+        try:
+            token = asyncio.run(auth.login())
+        except Exception as exc:
+            console.print(f"[red]error: {exc}[/red]")
+            raise SystemExit(1) from exc
+        console.print(f"authenticated — token cached at {auth.TOKEN_PATH}")
 
     provider = GitHubProvider(token=token)
     try:
-        result = asyncio.run(verify_candidate(args.handle, provider))
+        handle = asyncio.run(provider.whoami())
+    except Exception as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    if not args.json:
+        console.print(f"\nanalyzing [cyan]{handle}[/cyan]...")
+
+    previous = history.get_previous(handle)
+    try:
+        result = asyncio.run(_analyze(handle, provider))
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
     if args.json:
-        _print_json(args.handle, result)
+        _print_json(handle, result)
         return
 
-    console = Console()
-    _print_result(console, args.handle, result)
+    _print_result(console, handle, result, previous)
 
 
 def main() -> None:

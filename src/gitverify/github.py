@@ -83,6 +83,8 @@ query($login: String!) {
 }
 """
 
+WHOAMI_QUERY = "query { viewer { login } }"
+
 CI_MARKERS = {"workflows", ".gitlab-ci.yml"}
 TEST_MARKERS = {"tests", "test", "spec"}
 DOCKERFILE_MARKERS = {"Dockerfile"}
@@ -97,6 +99,17 @@ class GitHubProvider(Provider):
 
     def __init__(self, token: str):
         self.token = token
+
+    async def whoami(self) -> str:
+        headers = {"Authorization": f"Bearer {self.token}"}
+        async with _CONCURRENCY:
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.post(GRAPHQL_URL, json={"query": WHOAMI_QUERY}) as resp:
+                    resp.raise_for_status()
+                    payload = await resp.json()
+        if payload.get("errors"):
+            raise ValueError(f"GitHub GraphQL error: {payload['errors']}")
+        return payload["data"]["viewer"]["login"]
 
     async def fetch(self, handle: str) -> CodeProfile:
         headers = {"Authorization": f"Bearer {self.token}"}

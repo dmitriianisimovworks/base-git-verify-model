@@ -1,9 +1,11 @@
+<img src="docs/screenshot.png" width="100%" alt="gitverify screenshot">
+
 # gitverify
 
-A self-hosted CLI that scores a GitHub profile's authenticity from public
-signals — commits, PRs, issues, releases, CI, ownership — instead of a
-self-reported resume. Runs locally with your own token; nothing is sent
-anywhere except GitHub's API.
+A self-hosted CLI that scores your own GitHub profile's authenticity from
+public signals — commits, PRs, issues, releases, CI, ownership — instead of
+a self-reported resume. Runs locally with your own OAuth login; nothing is
+sent anywhere except GitHub's API.
 
 The score is split into 4 axes, weighted by how hard each is to fake:
 
@@ -17,44 +19,40 @@ Bands: `Strong` (≥70) / `Solid` (≥35) / `Thin` (below).
 ## Install
 
 ```
-pipx install .
+uv tool install .
 ```
 
-or, without installing:
-
-```
-uvx --from . gitverify <handle>
-```
-
-## Auth
-
-Log in once — no token to create by hand:
-
-```
-gitverify auth login
-```
-
-This opens a code you enter at github.com/login/device; the token is cached
-at `~/.config/gitverify/token`. `gitverify auth logout` clears it.
-
-For CI/scripting (no interactive browser), export a token with `read:user`
-scope instead:
-
-```
-export GITHUB_TOKEN=ghp_...
-gitverify <handle>
-```
+(or `pipx install .` if your `pipx` base interpreter isn't broken)
 
 ## Usage
 
+Just run it:
+
 ```
-gitverify octocat
-gitverify octocat --json
+gitverify
 ```
+
+First run walks you through GitHub's device flow — it opens your browser,
+you enter a code, done. The token is cached at
+`~/.config/gitverify/token`. From then on, `gitverify` authenticates
+automatically and analyzes the account you're logged in as — no handle to
+type, no token to create by hand.
+
+Every run is saved to `~/.config/gitverify/history.json`, so re-running
+later shows a delta (`[+2.3]` / `[-1.1]`) against your last score.
+
+```
+gitverify auth login    # authenticate (or re-authenticate)
+gitverify auth logout   # clear the cached token
+gitverify --json        # machine-readable output, no banner
+```
+
+CI/scripting without an interactive browser: set `GITHUB_TOKEN` (scope
+`read:user`) and it's used instead of the device flow.
 
 ## Development
 
 ```
 pip install -e .
-python -m gitverify <handle>
+python -m gitverify
 ```

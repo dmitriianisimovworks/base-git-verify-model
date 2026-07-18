@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+import webbrowser
 from pathlib import Path
 
 import aiohttp
@@ -21,9 +22,13 @@ async def login() -> str:
             device = await resp.json()
 
         print(
-            f"gitverify never sees your password. Open {device['verification_uri']} "
-            f"in your browser and enter this code: {device['user_code']}"
+            f"gitverify never sees your password. Enter this code at "
+            f"{device['verification_uri']}: {device['user_code']}"
         )
+        try:
+            webbrowser.open(device["verification_uri"])
+        except webbrowser.Error:
+            pass
         print("waiting for you to authorize...")
 
         interval = device["interval"]
