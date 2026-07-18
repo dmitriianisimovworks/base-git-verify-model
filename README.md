@@ -28,14 +28,7 @@ uvx --from . gitverify <handle>
 
 ## Auth
 
-Either export a token with `read:user` scope:
-
-```
-export GITHUB_TOKEN=ghp_...
-gitverify <handle>
-```
-
-or log in once via GitHub's device flow (no token to create by hand):
+Log in once — no token to create by hand:
 
 ```
 gitverify auth login
@@ -43,6 +36,14 @@ gitverify auth login
 
 This opens a code you enter at github.com/login/device; the token is cached
 at `~/.config/gitverify/token`. `gitverify auth logout` clears it.
+
+For CI/scripting (no interactive browser), export a token with `read:user`
+scope instead:
+
+```
+export GITHUB_TOKEN=ghp_...
+gitverify <handle>
+```
 
 ## Usage
 
